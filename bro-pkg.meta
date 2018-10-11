@@ -1,0 +1,3 @@
+[package]
+description = Provides mechanisms for managing and using institutional knowledge about a monitored environment to make informed observations of normal and abnormal network activity.
+tags = input, labels
