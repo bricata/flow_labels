@@ -54,14 +54,8 @@ export  {
     # Record for writing labeled flows to the log stream
     type Info: record {
         ts: time &log;
-        cluster_node: Cluster::NodeType &log;
-        #proto: transport_proto &optional &log;
-        #orig_h: addr &optional &log;
-        #orig_p: count &optional &log;
-        #resp_h: addr &optional &log;
-        #resp_p: count &optional &log;
+        #cluster_node: Cluster::NodeType &log;
         uid: string &optional &log;
-        #pcr: string &optional &log;
         labels: conn_fields &optional &log;
     };
 
@@ -453,15 +447,15 @@ event new_connection(c: connection)
     c$labels$flow = set();
     }
 
-#  Register to receive the needed events on the Manager node 
-# event  remote_connection_established(p: event_peer) {
-#    if ( Cluster::local_node_type() == Cluster::MANAGER ) { 
-#        # When a worker connects register for the appropriate events 
-#        if ( p?$class && /worker/ in p$class ) {
-#            request_remote_events(p, /^connection_state_remove/);
-#        }
-#    }
-#}
+# Register to receive the needed events on the Manager node 
+event  remote_connection_established(p: event_peer) {
+    if ( Cluster::local_node_type() == Cluster::MANAGER ) { 
+        # When a worker connects register for the appropriate events 
+        if ( p?$class && /worker/ in p$class ) {
+            request_remote_events(p, /^connection_state_remove/);
+        }
+    }
+}
 
 # Set up the labels log stream
 event bro_init() {
@@ -507,9 +501,6 @@ event connection_state_remove(c: connection) &priority=0 {
     local orig_labels = get_cidr_labels(c$id$orig_h);
     local resp_labels = get_cidr_labels(c$id$resp_h);
     local fm = get_flow_labels(c);
-
-    Reporter::info(fmt("%d labels found for %s and %d for %s", |orig_labels|, c$id$orig_h, |resp_labels|, c$id$orig_h));
-    Reporter::info(fmt("%d labels found for uid %s", |fm$labels|, c$uid));
 
     # add orig_labels to the set 
     if ( |orig_labels| > 0 )
@@ -624,7 +615,6 @@ event connection_state_remove(c: connection) &priority=0 {
     # populate the flow_label Info record and write it to log
     local match = flow_labels::Info(
         $ts = c$start_time,
-        $cluster_node = Cluster::local_node_type(),
         $uid = c$uid,
         $labels = c$labels
     );
