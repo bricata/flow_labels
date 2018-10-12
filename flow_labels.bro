@@ -505,12 +505,10 @@ event connection_state_remove(c: connection) &priority=0 {
 
     local orig_labels = get_cidr_labels(c$id$orig_h);
     local resp_labels = get_cidr_labels(c$id$resp_h);
-    
-    Reporter::info(fmt("%d labels found for %s and %d for %s", |orig_labels|, |resp_labels|, c$id$orig_h, c$id$orig_h));
-
     local fm = get_flow_labels(c);
 
-    Reporter::info(fmt("%d labels found for uid %s", |fm|, c$uid));
+    Reporter::info(fmt("%d labels found for %s and %d for %s", |orig_labels|, c$id$orig_h, |resp_labels|, c$id$orig_h));
+    Reporter::info(fmt("%d labels found for uid %s", |fm$labels|, c$uid));
 
     # add orig_labels to the set 
     if ( |orig_labels| > 0 )
