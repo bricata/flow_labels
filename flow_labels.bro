@@ -119,7 +119,7 @@ export  {
         suspicious: bool &optional &log;
     };
 
-    # Record for cidrkb entries
+    # Record for cidr_kb entries
     type cidr_labels: record {
         static: set[string] &optional;
         dynamic: set[string] &optional &create_expire=11 mins;
@@ -283,8 +283,9 @@ function add_ip_label(l: string, a: addr)
 # Check if an IP has a specified label 
 function ip_has_label(host: addr, terms: set[string]): bool
     {
-    # Check to see if a given term exists in an IP's cidr_kb base
-    local term_match: bool = F;
+    # Check if an IP has the listed labels
+    local need = |terms|;
+    local found = 0;
 
     if ( host in cidr_kb ) {
         for ( net in cidr_kb ) {
@@ -292,14 +293,16 @@ function ip_has_label(host: addr, terms: set[string]): bool
                 for ( t in terms ) {
                     local s = to_lower(strip(t));
                     if ( s in cidr_kb[net]$static ) {
-                        term_match = T;
+                        found += 1;
+                    } else if ( s in cidr_kb[net]$dynamic ) {
+                        found += 1;
                     }
                 }
             }
         }
     }
 
-    return term_match;
+    return need == found;
 }
 
 #  Check if a connection has matching labels  
@@ -417,7 +420,7 @@ function get_flow_labels(c: connection): flow_meta {
     return fm;
 }
 
-# Retrieve all static labels for a given IP address from the cidr_kb
+# Retrieve all labels for a given IP address from the cidr_kb
 function get_cidr_labels(host: addr): set[string]
     {
     local clabels: set[string] = set();
@@ -463,7 +466,6 @@ event new_connection(c: connection)
 # Set up the labels log stream
 event bro_init() {
     if ( logging_mode != log_none ) {
-        Reporter::info("flow_labels created the log stream.");
         Log::create_stream(flow_labels::LOG, [$columns=Info, $ev=log_labeled_flow, $path="labeled_flows"]);
     }
 }
@@ -490,9 +492,9 @@ event connection_state_remove (c: connection) &priority=3
 #  Add static labels at the end of the connection 
 event connection_state_remove(c: connection) &priority=0 {
     
-    # If the labels doesn't exist we have a partial connection.
-    # Dynamic labeling didn't happen but we can still add 
-    # static labels.  
+    # If the labels field doesn't exist we have a partial connection.
+    # Dynamic labeling didn't happen but we still enrich with static
+    # labels.  
     if ( ! c?$labels )
         {
         c$labels = conn_fields();
@@ -501,10 +503,14 @@ event connection_state_remove(c: connection) &priority=0 {
         c$labels$flow = set();
         }   
 
-    local orig_labels = flow_labels::get_cidr_labels(c$id$orig_h);
-    local resp_labels = flow_labels::get_cidr_labels(c$id$resp_h);
+    local orig_labels = get_cidr_labels(c$id$orig_h);
+    local resp_labels = get_cidr_labels(c$id$resp_h);
     
+    Reporter::info(fmt("%d labels found for %s and %d for %s", |orig_labels|, |resp_labels|, c$id$orig_h, c$id$orig_h));
+
     local fm = get_flow_labels(c);
+
+    Reporter::info(fmt("%d labels found for uid %s", |fm|, c$uid));
 
     # add orig_labels to the set 
     if ( |orig_labels| > 0 )
@@ -620,11 +626,6 @@ event connection_state_remove(c: connection) &priority=0 {
     local match = flow_labels::Info(
         $ts = c$start_time,
         $cluster_node = Cluster::local_node_type(),
-        #$proto = c$conn$proto,
-        #$orig_h = c$id$orig_h,
-        #$orig_p = port_to_count(c$id$orig_p),
-        #$resp_h = c$id$resp_h,
-        #$resp_p = port_to_count(c$id$resp_p),
         $uid = c$uid,
         $labels = c$labels
     );
