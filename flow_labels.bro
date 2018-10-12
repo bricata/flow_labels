@@ -489,6 +489,7 @@ event connection_state_remove (c: connection) &priority=3
     }
 }
 
+@if ( Cluster::local_node_type() == Cluster::MANAGER )
 #  Add static labels at the end of the connection 
 event connection_state_remove(c: connection) &priority=0 {
     
@@ -631,7 +632,6 @@ event connection_state_remove(c: connection) &priority=0 {
     Log::write(flow_labels::LOG, match);
 }
 
-@if ( Cluster::local_node_type() == Cluster::MANAGER )
 # Process entries in the cidr.labels file 
 event read_cidr_labels(desc: Input::EventDescription, tpe: Input::Event, ci: flow_labels::cidr_label_entry) {
     
